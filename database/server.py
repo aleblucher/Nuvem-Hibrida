@@ -57,7 +57,7 @@ def atualiza_task(id_task):
 # Healthcheck
 @app.route('/healthcheck', methods=['GET'])
 def healthcheck():
-    return {"status" : "Código 200 sem texto"}
+    return ""
 
 
 if __name__ == "__main__":

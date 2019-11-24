@@ -47,7 +47,4 @@ def muda_info_tarefa(conn, id, info):
             conn.commit()
             return ""
         except pymysql.err.IntegrityError as e:
-            raise ValueError(f'Não posso alterar info do id {id} na tabela usuario')
-
-
-
+            raise ValueError(f'Não posso alterar info do id {id} na tabela tarefa')
