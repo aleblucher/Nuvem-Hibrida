@@ -11,8 +11,7 @@ def cria_tarefa(conn, info):
             return 23123
         except:
             print(222)
-            raise ValueError(f'Não posso inserir {info["description"]} na tabela tarefa')
-
+            
 
 def acha_tarefa(conn, info):
     with conn.cursor() as cursor:
@@ -47,4 +46,4 @@ def muda_info_tarefa(conn, id, info):
             conn.commit()
             return ""
         except pymysql.err.IntegrityError as e:
-            raise ValueError(f'Não posso alterar info do id {id} na tabela tarefa')
+            print(123)
