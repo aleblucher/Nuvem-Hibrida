@@ -10,7 +10,8 @@ ec2 = boto3.client('ec2')
 
 
 # Alocar IP elastico e associar ao security group
-def createInstConnector(private_IP):
+def createInstConnector(private_IP, security_group):
+    print("Subindo a máquina conectora")
     ec2r = boto3.resource('ec2')
     resp_con = ec2r.create_instances(
 
@@ -20,10 +21,10 @@ def createInstConnector(private_IP):
     MaxCount=1,
     MinCount=1,
 
-
-    SecurityGroups=[
-        'banana_group',
+    SecurityGroupIds=[
+        security_group,
     ],
+
     UserData='''#!/bin/bash
 sudo apt -y update
 
@@ -50,20 +51,12 @@ sudo tmux new -d -s execution 'export SERVER={}; sudo python3 ./database/connect
     )
 
 
-    #allocation = ec2.allocate_address(Domain='vpc')
-
     return resp_con
 
 
-def createSecurityGroup():
-
-    ec2.create_security_group(
-    Description='myfirstdescritption',
-    GroupName='banana_group',
-    )
-
 
 def createInstDB():
+    print("Subindo a máquina da DataBase")
     ec2r = boto3.resource('ec2')
     ec2c = boto3.client('ec2')
 
@@ -123,7 +116,9 @@ EOF
 
 sudo pip3 install requests
 sudo apt install tmux
-sudo tmux new -d -s execution 'export SERVER="http://localhost:5000"; sudo python3 ./database/connector.py'
+sudo pip3 install pymsql
+sudo python3 -m pip install PyMySQL
+sudo tmux new -d -s execution 'sudo python3 ./database/server.py'
 ''',
 
     TagSpecifications=[
@@ -154,6 +149,36 @@ sudo tmux new -d -s execution 'export SERVER="http://localhost:5000"; sudo pytho
 
     return resp_db, tt[0], tt[0].private_ip_address
 
+def createElasticIP():
+    print("Alocando um IP elástico")
+    allocation = ec2.allocate_address(Domain='vpc')
+    res = allocation['PublicIp']
+    return res
+
+def createSecurityGroup(elastic_IP):
+    print("Criando o security group")
+    ec2r = boto3.resource('ec2')
+    sec_group = ec2r.create_security_group(
+    GroupName='SecurityDB', Description='Projeto final')
+    sec_group.authorize_ingress(
+    CidrIp= elastic_IP+'/32',
+    IpProtocol='tcp',
+    FromPort=5001,
+    ToPort=5001
+)
+    return sec_group
+
+
+
+
+# Sobe a maquina do DB
 resp_db, response, pip = createInstDB()
-print(response.public_ip_address)
-print(createInstConnector(pip))
+
+# Aloca um IP elástico
+elastic_IP = createElasticIP()
+
+# Cria um SG baseado no IP elástico
+security_group = createSecurityGroup(elastic_IP)
+
+# Sobe o conector com o SG e o IP privado do DB 
+print(createInstConnector(pip, security_group.id))
