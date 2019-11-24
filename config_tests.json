@@ -1,0 +1,7 @@
+{
+    "MYSQL": "mysql",
+    "HOST": "127.0.0.1",
+    "USER": "leca",
+    "PASS": "leca",
+    "LOGFILE": "log.txt"
+}
