@@ -18,6 +18,7 @@ conn = pymysql.connect(
     database='banana'
 )
 
+cria_db(conn)
 
 @app.route('/tarefa', methods=['POST'])
 def add_task():

@@ -1,5 +1,9 @@
 import pymysql
 
+def create_db(conn):
+    with open('script_create.sql') as f:
+        with conn.cursor() as cursor:
+            cursor.execute(f.read().decode('utf-8'), multi=True)
 
 def cria_tarefa(conn, info):
     print(info)
