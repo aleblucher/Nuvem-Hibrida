@@ -1,18 +1,15 @@
 import pymysql
 
-def create_db(conn):
-    with open('script_create.sql') as f:
-        with conn.cursor() as cursor:
-            cursor.execute(f.read().decode('utf-8'), multi=True)
-
 def cria_tarefa(conn, info):
-    print(info)
+
+    print(conn)
     with conn.cursor() as cursor:
-        try:
-            cursor.execute("""INSERT INTO tarefa (description, difficulty)
+        cursor.execute("""INSERT INTO tarefa (description, difficulty)
                            VALUES (%s, %s);""", (info["description"], info["difficulty"]))
-            conn.commit()
-            return 23123
+        conn.commit()
+        return 23123
+        try:
+          pass  
         except:
             print(222)
             

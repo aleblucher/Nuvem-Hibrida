@@ -1,6 +1,6 @@
 
 import json
-
+import subprocess
 from flask import Flask, request
 from tools import *
 
@@ -18,7 +18,20 @@ conn = pymysql.connect(
     database='banana'
 )
 
-cria_db(conn)
+def cria_db(filename = 'database/script_create.sql'):
+    global config
+    with open(filename, 'rb') as f:
+        subprocess.run(
+            [
+                config['MYSQL'], 
+                '-u', config['USER'], 
+                '-p' + config['PASS'], 
+                '-h', config['HOST']
+            ], 
+            stdin=f
+        )
+
+cria_db()
 
 @app.route('/tarefa', methods=['POST'])
 def add_task():
