@@ -180,8 +180,8 @@ def createSecurityGroupWithElasticIP(elastic_IP):
     sec_group.authorize_ingress(
     CidrIp= elastic_IP+'/32',
     IpProtocol='tcp',
-    FromPort=5001,
-    ToPort=5001
+    FromPort=5000,
+    ToPort=5000
 )
     sec_group.authorize_ingress(
     CidrIp= '0.0.0.0/0',
@@ -363,8 +363,8 @@ def createSecurityGroupLoadBalancer():
     sec_group.authorize_ingress(
     CidrIp= '0.0.0.0/0',
     IpProtocol='tcp',
-    FromPort=5001,
-    ToPort=5001
+    FromPort=5000,
+    ToPort=5000
 )
     sec_group.authorize_ingress(
     CidrIp= '0.0.0.0/0',
@@ -383,9 +383,9 @@ def createLoadBalancer(security_group):
     Listeners=[
         {
             'Protocol': 'TCP',
-            'LoadBalancerPort': 5001,
+            'LoadBalancerPort': 5000,
             'InstanceProtocol': 'TCP',
-            'InstancePort': 5001,
+            'InstancePort': 5000,
         },
     ],
     AvailabilityZones=[
@@ -411,6 +411,8 @@ def createAutoScalling(instance_id):
         'ALECER',
     ]
 )
+
+
     return responseAS
 
 
