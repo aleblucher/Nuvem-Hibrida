@@ -8,5 +8,3 @@ CREATE TABLE tarefa (
     difficulty INT,
     PRIMARY KEY (id_tarefa)
     );
-
--- ERRO DE MYSQL https://stackoverflow.com/questions/25865104/field-id-doesnt-have-a-default-value
