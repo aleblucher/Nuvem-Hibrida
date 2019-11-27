@@ -1,30 +1,42 @@
 import boto3
 import time
 
-
 ec2_R_OHIO = boto3.resource('ec2', region_name= 'us-east-2')
 ec2_C_OHIO = boto3.client('ec2', region_name= 'us-east-2')
 ec2_R_NV = boto3.resource('ec2', region_name= 'us-east-1')
 ec2_C_NV = boto3.client('ec2', region_name= 'us-east-1')
+ec2_C_ELB = boto3.client('elb')
+ec2_C_AUTOSCALING = boto3.client('autoscaling')
 
 
-# ec2 = boto3.client('ec2')
-# keypair = ec2.create_key_pair(KeyName='banananana')
+def createKeyOHIO():
+    print("Criando chave KEY_OHIO \n")
+    key_pair = ec2_R_OHIO.create_key_pair(KeyName='KEY_OHIO')
 
-# with open("myfile.txt","w")  as f:
-    
-#     f.write(str(keypair))
+    actual_key = str(key_pair.key_material)
+
+    with open('key_ohio.pem','w') as file:
+        file.write(actual_key)
+
+
+def createKeyNV():
+    print("Criando chave KEY_OHIO \n")
+    key_pair = ec2_R_NV.create_key_pair(KeyName='KEY_NV')
+
+    actual_key = str(key_pair.key_material)
+
+    with open('key_nv.pem','w') as file:
+        file.write(actual_key)
 
 
 
-# Alocar IP elastico e associar ao security group
 # OHIO
 def createInstConnector(private_IP, security_group):
-    print("Subindo a máquina conectora")
+    print("Subindo a máquina conectora\n")
     resp_con = ec2_R_OHIO.create_instances(
     ImageId='ami-0d5d9d301c853a04a',
     InstanceType='t2.micro',
-    KeyName='KEY_LEK_OHIO',
+    KeyName='KEY_OHIO',
     MaxCount=1,
     MinCount=1,
 
@@ -79,12 +91,12 @@ sudo tmux new -d -s execution 'export SERVER=http://{}:5000;python3 ./database/c
 
 # OHIO
 def createInstDB(security_group):
-    print("Subindo a máquina da DataBase")
+    print("Subindo a máquina da DataBase\n")
     resp_db = ec2_R_OHIO.create_instances(
 
     ImageId='ami-0d5d9d301c853a04a', #OHIO IMAGE
     InstanceType='t2.micro',
-    KeyName='KEY_LEK_OHIO',
+    KeyName='KEY_OHIO',
     MaxCount=1,
     MinCount=1,
     SecurityGroupIds=[
@@ -165,18 +177,29 @@ sudo tmux new -d -s execution 'python3 ./database/server.py'
 
     return resp_db, tt[0], tt[0].private_ip_address
 
+
 # NORTH VIRGINIA
 def createElasticIP():
-    print("Alocando um IP elástico")
+    print("Alocando um IP elástico \n")
     allocation = ec2_C_NV.allocate_address(Domain='vpc')
-    res = allocation['PublicIp']
     return allocation
+
+def clearElasticIP():
+    print('Liberando um IP elástico \n')
+    response = ec2_C_NV.describe_addresses()
+    aloc = response['Addresses'][0]['AllocationId']
+    pubip = response['Addresses'][0]['PublicIp']
+
+
+    response2 = ec2_C_NV.release_address(
+    AllocationId=aloc,
+)
 
 # OHIO
 def createSecurityGroupWithElasticIP(elastic_IP):
-    print("Criando o security group")
+    print("Criando o security group\n")
     sec_group = ec2_R_OHIO.create_security_group(
-    GroupName='SecurityDB', Description='Projeto final')
+    GroupName='Nott', Description='Projeto final')
     sec_group.authorize_ingress(
     CidrIp= elastic_IP+'/32',
     IpProtocol='tcp',
@@ -195,9 +218,29 @@ def createSecurityGroupWithElasticIP(elastic_IP):
 
 # OHIO
 def createSecurityGroup():
-    print("Criando o security group")
+    print("Criando o security group: Caleb\n")
     sec_group = ec2_R_OHIO.create_security_group(
-    GroupName='1st', Description='Projeto final')
+    GroupName='Caleb', Description='Projeto final')
+    sec_group.authorize_ingress(
+    CidrIp= '0.0.0.0/0',
+    IpProtocol='tcp',
+    FromPort=5000,
+    ToPort=5000
+)
+    sec_group.authorize_ingress(
+    CidrIp= '0.0.0.0/0',
+    IpProtocol='tcp',
+    FromPort=22,
+    ToPort=22
+)
+    return sec_group    
+
+
+# NORTH VIRGINIA
+def createSecurityGroupNV():
+    print("Criando o security group: Jester\n")
+    sec_group = ec2_R_NV.create_security_group(
+    GroupName='Jester', Description='Projeto final')
     sec_group.authorize_ingress(
     CidrIp= '0.0.0.0/0',
     IpProtocol='tcp',
@@ -212,20 +255,21 @@ def createSecurityGroup():
 )
     return sec_group
 
+
 # NORTH VIRGINIA
-def createInsOutsider(allocation_ID, pub_IP): #adicionar o param security group
-    print("Subindo a segunda nuvem")
+def createInsOutsider(allocation_ID, pub_IP, sg_id):
+    print("Subindo a instancia: Outsider\n")
 
     resp_out = ec2_R_NV.create_instances(
 
     ImageId='ami-04763b3055de4860b',
     InstanceType='t2.micro',
-    KeyName='2nd',
+    KeyName='KEY_NV',
     MaxCount=1,
     MinCount=1,
 
     SecurityGroupIds=[
-        'sg-0b0f8470d177c6479',
+        sg_id,
     ],
 
     UserData='''#!/bin/bash
@@ -273,9 +317,6 @@ sudo tmux new -d -s execution 'export SERVER=http://{}:5000;python3 ./database/c
         ])
         instance_status = temp['Reservations'][0]['Instances'][0]['State']['Name']
     
-
-        print(instance_status)
-        print("\n")
         time.sleep(3)
         
     if instance_status == 'running':
@@ -283,27 +324,25 @@ sudo tmux new -d -s execution 'export SERVER=http://{}:5000;python3 ./database/c
         AllocationId=allocation_ID,
         InstanceId=tt[0].id,
         )
-        print('agora sim!')
 
-        return resp_ass, tt[0].id, ipp
+        return resp_ass, tt[0].id
     else:
         return 'erro'
 
 
-
-
-def createConnectorPublicIp(pub_IP):
-    print("Subindo a máquina do outsider com ip externo")
+# NORTH VIRGINIA
+def createConnectorPublicIp(pub_IP, sg_id):
+    print("Subindo a instancia: Brigde\n")
     resp_db = ec2_R_NV.create_instances(
 
     ImageId='ami-04763b3055de4860b',
     InstanceType='t2.micro',
-    KeyName='2nd',
+    KeyName='KEY_NV',
     MaxCount=1,
     MinCount=1,
 
     SecurityGroupIds=[
-        'sg-0b0f8470d177c6479',
+        sg_id,
     ],
 
     UserData='''#!/bin/bash
@@ -324,7 +363,7 @@ sudo tmux new -d -s execution 'export SERVER=http://{}:5000;python3 ./database/c
             'Tags': [
                 {
                     'Key': 'Name',
-                    'Value': 'Outsider'
+                    'Value': 'Bridge'
                 },
             ]
         },
@@ -347,19 +386,16 @@ sudo tmux new -d -s execution 'export SERVER=http://{}:5000;python3 ./database/c
     while (response.public_ip_address == None):
         response = ec2_R_NV.Instance(tt[0].id)
 
-    print(dir(tt[0]))
-    print(tt[0].public_ip_address)
 
     return resp_db, tt[0].id, response.public_ip_address
 
 
 
-
-
 # NORTH VIRGINIA
 def createSecurityGroupLoadBalancer():
+    print("Criando o security group: Beau\n")
     sec_group = ec2_R_NV.create_security_group(
-    GroupName='LoadBalancerSG', Description='Load Balancer')
+    GroupName='Beau', Description='Load Balancer')
     sec_group.authorize_ingress(
     CidrIp= '0.0.0.0/0',
     IpProtocol='tcp',
@@ -376,10 +412,11 @@ def createSecurityGroupLoadBalancer():
     return sec_group
 
 
+# NORTH VIRGINIA
 def createLoadBalancer(security_group):
-    client = boto3.client('elb')
-    responseLB = client.create_load_balancer(
-    LoadBalancerName='ALECER',
+    print("Criando o Load Balancer: Cadeuceus\n")
+    responseLB = ec2_C_ELB.create_load_balancer(
+    LoadBalancerName='Cadeuceus',
     Listeners=[
         {
             'Protocol': 'TCP',
@@ -399,25 +436,193 @@ def createLoadBalancer(security_group):
 
     return responseLB
 
+
+# NORTH VIRGINIA
 def createAutoScalling(instance_id):
-    client = boto3.client('autoscaling')
-    responseAS = client.create_auto_scaling_group(
-    AutoScalingGroupName='ALEUP',
+    print("Criando o Auto Scalling Group: Fjord\n")
+    waiter = ec2_C_NV.get_waiter('instance_running')
+
+    waiter.wait(
+    InstanceIds=[
+        instance_id,
+    ]
+)
+
+    responseAS = ec2_C_AUTOSCALING.create_auto_scaling_group(
+    AutoScalingGroupName='Fjord',
     InstanceId=instance_id,
     MinSize=1,
     MaxSize=10,
     HealthCheckGracePeriod=300,
     LoadBalancerNames=[
-        'ALECER',
+        'Cadeuceus',
+    ],
+    Tags=[
+        {
+            'Key': 'Name',
+            'Value': 'AutoScaller'
+        }
     ]
 )
-
-
     return responseAS
+
+
+# OHIO ou NV
+def terminateInstance(ec2_C, instance_name):
+
+    num_ins = 0
+    r = ec2_C.describe_tags()
+    for i in r['Tags']:
+        if i['Key'] == 'Name' and i['Value'] == instance_name:
+            num_ins += 1
+
+
+    response = ec2_C.describe_instances(Filters=[
+        {
+            'Name': 'tag:Name',
+            'Values': [
+                instance_name,
+            ]
+        },
+    ])
+
+    instanceId = []
+    for i in response['Reservations']:
+        for j in i['Instances']:
+            instanceId.append(j['InstanceId'])
+            
+
+    print('Terminando a instancia: %s \n' % instance_name)
+    if instanceId:
+        ec2_C.terminate_instances(InstanceIds=instanceId)
+        waiter = ec2_C.get_waiter('instance_terminated')
+
+        waiter.wait(InstanceIds=instanceId)
+
+
+# OHIO ou NV
+def deleteSecurityGroup(ec2_C, sg_name):
+    securityGroupId = ''
+    try:
+        sec_group = ec2_C.describe_security_groups(GroupNames=[sg_name])
+        for i in sec_group['SecurityGroups']:
+            securityGroupId = i['GroupId']
+    except:
+        print("Não foi encontrado nenhum security group\n")
+    
+    try:
+        ec2_C.delete_security_group(GroupId=securityGroupId)
+        print('Deletando o security group: %s \n' % (sg_name))
+    except:
+        print('Não foi possível deletar o security group: %s\n' % (sg_name))
+
+
+# OHIO ou NV
+def deleteLoadBalancer(lb_name):
+    try:
+        response = ec2_C_ELB.describe_load_balancers(
+                LoadBalancerNames=[lb_name]
+            )
+
+        resp = response['LoadBalancerDescriptions'][0]['LoadBalancerName']
+    except:
+        print('Não existe nenhum load balancer com esse nome \n')
+    try:        
+        response = ec2_C_ELB.delete_load_balancer(
+            LoadBalancerName=resp
+)
+
+        time.sleep(15)
+        print('Deletando o load balancer: %s \n' % (lb_name))
+    except:
+        print('Não foi possível deletar o load balancer: %s\n' %(lb_name))    
+
+def deleteAutoScaller(as_name):
+    try:
+        response = ec2_C_AUTOSCALING.delete_auto_scaling_group(
+    AutoScalingGroupName=as_name,
+    ForceDelete=True
+)
+
+        print('Deletando o auto scaling group: %s \n' % (as_name))
+        while True:
+            is_it_gone = ec2_C_AUTOSCALING.describe_auto_scaling_groups(
+                AutoScalingGroupNames=[as_name]
+            )
+
+            yet = len(is_it_gone['AutoScalingGroups'])
+            if yet == 0:
+                break
+
+            time.sleep(3)
+        
+
+    except:
+        print('Não foi possível deletar o auto scaling group: %s \n' % (as_name))
+
+
+def deleteLaunchConfiguration(lc_name):
+    try:
+        response = ec2_C_AUTOSCALING.delete_launch_configuration(
+            LaunchConfigurationName=lc_name
+        )
+        print('Deletando o launch configuration: %s \n' % (lc_name))
+    except:
+        print('Não foi possível deletar o launch configuration: %s \n' % (lc_name))
+
+
+
+
+# Limpa tudo antes de rodar o script de criação
+clearElasticIP()
+deleteAutoScaller('Fjord')
+deleteLoadBalancer('Cadeuceus')
+deleteLaunchConfiguration('Fjord')
+
+try:
+    terminateInstance(ec2_C_OHIO, 'Database')
+except:
+    print("Essa instancia ainda não existe!\n")
+
+try:
+    terminateInstance(ec2_C_OHIO, 'Connector')
+except:
+    print("Essa instancia ainda não existe!\n")
+
+try:
+    terminateInstance(ec2_C_NV, 'Outsider')
+except:
+    print("Essa instancia ainda não existe!\n")
+
+try:
+    terminateInstance(ec2_C_NV, 'Bridge')
+except:
+    print("Essa instancia ainda não existe!\n")
+
+
+deleteSecurityGroup(ec2_C_OHIO, 'Caleb')
+deleteSecurityGroup(ec2_C_OHIO, 'Nott')
+deleteSecurityGroup(ec2_C_NV, 'Beau')
+deleteSecurityGroup(ec2_C_NV, 'Jester')
+
+
+
+# Cria os key pairs para as duas regiões
+try:
+    createKeyNV()
+except:
+    print("Chave KEY_NV já existe. \n")
+
+
+try:
+    createKeyOHIO()
+except:
+    print("Chave KEY_OHIO já existe. \n")
 
 
 # Primeiro security group
 first_sg = createSecurityGroup()
+ohio_sg = createSecurityGroupNV()
 
 # Sobe a maquina do DB
 resp_db, response, pip = createInstDB(first_sg.id)
@@ -426,37 +631,23 @@ resp_db, response, pip = createInstDB(first_sg.id)
 temp = createElasticIP()
 elastic_IP = temp['PublicIp']
 allocation_ID = temp['AllocationId']
-print("\n")
-print(elastic_IP)
-print(allocation_ID)
-print("\n")
 
 # Cria um SG baseado no IP elástico
 security_group = createSecurityGroupWithElasticIP(elastic_IP)
 
 # Sobe o conector com o SG e o IP privado do DB 
 oi , pp = createInstConnector(pip, security_group.id)
-print(pp)
 # Sobe a máquina 'outsider', correspondente a segunda cloud
-resp, id_maquina, ipp = createConnectorPublicIp(pp)
-print(resp,"adhwuidhahwdahwuidhaiwhdawdhawuid", ipp, "aiuduawhduawhdhawdhiuawhduiawhduiawhiudhauidhauidhauiwhduiawhduiahwduiawhduiahdiuawhduihawuidhauidhwaiuhd")
+resp, id_maquina = createInsOutsider(allocation_ID, pp, ohio_sg.id)
 
-resp, id_maquina, ipp = createConnectorPublicIp(ipp)
-print(resp,"adhwuidhahwdahwuidhaiwhdawdhawuid", ipp, "aiuduawhduawhdhawdhiuawhduiawhduiawhiudhauidhauidhauiwhduiawhduiahwduiawhduiahdiuawhduihawuidhauidhwaiuhd")
+resp, id_maquina, ipp = createConnectorPublicIp(elastic_IP, ohio_sg.id)
 
 
 # Cria um SG para o Load Balancer
-print("\n")
-print("Criando o Security Group para o Load Balancer")
 lb_group = createSecurityGroupLoadBalancer()
 
 # Cria o Load Balncer
-print("\n")
-print("criando o Load Balancer")
 i_lb_u = createLoadBalancer(lb_group)
-print(i_lb_u)
 
 # Cria Auto Scalling
-print("\n")
-print("Criando o AutoScalling")
-print(createAutoScalling(id_maquina))
+createAutoScalling(id_maquina)
