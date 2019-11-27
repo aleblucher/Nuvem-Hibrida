@@ -71,7 +71,7 @@ sudo tmux new -d -s execution 'export SERVER=http://{}:5000;python3 ./database/c
 
 
     tt = []
-    for i in resp_db:
+    for i in resp_con:
         tt.append(i)
 
     response = ec2_C_OHIO.describe_instances(
@@ -637,6 +637,7 @@ security_group = createSecurityGroupWithElasticIP(elastic_IP)
 
 # Sobe o conector com o SG e o IP privado do DB 
 oi , pp = createInstConnector(pip, security_group.id)
+print(pp)
 # Sobe a máquina 'outsider', correspondente a segunda cloud
 resp, id_maquina = createInsOutsider(allocation_ID, pp, ohio_sg.id)
 
